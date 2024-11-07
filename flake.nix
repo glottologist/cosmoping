@@ -127,6 +127,11 @@
             watch.exec = ''
               cargo watch -c -q -w ./src -x build
             '';
+
+            cosmoping.exec = ''
+              cargo run -- latency --addrbook-path ./addrbook.json
+
+            '';
           };
           dotenv.enable = true;
           difftastic.enable = true;
