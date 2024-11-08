@@ -68,6 +68,16 @@
             version = ver;
             src = ./.;
 
+            nativeBuildInputs = with pkgs; [
+              openssh
+              openssl
+              pkg-config
+            ];
+
+            buildInputs = with pkgs; [
+              openssl
+            ];
+
             cargoLock = {
               lockFile = ./Cargo.lock;
             };

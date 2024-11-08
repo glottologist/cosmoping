@@ -1,11 +1,3 @@
-use reqwest::Client;
-use serde::Deserialize;
-use std::cmp::Ordering;
-use std::net::SocketAddr;
-use tokio::net::TcpStream;
-use tokio::{task, time::Instant};
-use tracing::{error, info};
-
 use crate::{
     error::CosmopingError,
     parser::AddrBook,
@@ -13,7 +5,11 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::future::join_all;
-use tokio::time::{timeout, Duration};
+use reqwest::Client;
+use serde::Deserialize;
+use std::cmp::Ordering;
+use tokio::task;
+use tracing::{error, info};
 
 #[async_trait]
 pub trait Ping {
@@ -29,7 +25,6 @@ impl AddrBookPinger {
         Self { location_api_key }
     }
 }
-
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct GeoInfo {
@@ -112,26 +107,18 @@ impl Latency for AddrBookPinger {
         port: u16,
     ) -> Option<ReportLine> {
         info!("Measuring latency for  {} on {}:{}", &id, &host, &port);
-        // Construct the socket address
-        let socket_addr: SocketAddr = match format!("{}:{}", host, port).parse() {
-            Ok(addr) => addr,
-            Err(e) => {
-                error!("Unable to connect to {} | {} ", host, e);
-                return None;
+        let payload = [0; 8];
+        let ip_host = host.parse().ok();
+
+        let dur = if let Some(ip) = ip_host {
+            match surge_ping::ping(ip, &payload).await {
+                Ok((_p, d)) => Some(d.as_millis() as u64),
+                _ => None,
             }
+        } else {
+            None
         };
 
-        let start = Instant::now();
-        let duration = Duration::from_secs(60); // 60 seconds timeout
-
-        let dur = match timeout(duration, TcpStream::connect(socket_addr)).await {
-            Ok(Ok(_)) => {
-                let elapsed = start.elapsed();
-
-                Some(elapsed.as_millis() as u64)
-            }
-            _ => None,
-        };
         let geo = if dur.is_some() {
             if api_key.is_some() {
                 info!("Getting location for  {} on {}:{}", &id, &host, &port);

@@ -17,7 +17,10 @@ impl Display for Report {
         writeln!(f)?;
 
         // Write the table header
-        writeln!(f, "| IP Address | Port | ID | Latency | City | Country |")?;
+        writeln!(
+            f,
+            "| IP Address | Port | ID | Ping Latency(ms) | City | Country |"
+        )?;
         writeln!(f, "|------------|------|----|---------| ---- | ------- |")?;
 
         for report_line in &self.report_lines {
