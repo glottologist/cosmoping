@@ -97,7 +97,7 @@
           name = "Cosmoping shell for Rust";
           env.GREET = "devenv for Cosmoping";
           env.PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-          env.LOCATION_API_TOKEN = "a8c634caacb142";
+          env.LOCATION_API_TOKEN = "<API_TOKEN>";
           packages = with pkgs; [
             git
             mdbook

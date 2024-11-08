@@ -1,0 +1,35 @@
+name: Build
+
+# Runs on pushes targeting things that look like the default branch
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "flake.nix"
+      - "flake.lock"
+      - "src"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v21
+        with:
+          nix_conf: experimental-features = nix-command flakes
+      - name: Build
+        run: nix build .cosmoping --print-build-logs
+
+      - name: Adjust permissions
+        run: |
+          chown -R `id -u`:`id -g` ./result
+          chmod -R a+rwx ./result
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: cosmoping
+          path: ./result/bin/cosmoping
