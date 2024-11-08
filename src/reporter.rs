@@ -17,8 +17,8 @@ impl Display for Report {
         writeln!(f)?;
 
         // Write the table header
-        writeln!(f, "| IP Address | Port | ID | Latency |")?;
-        writeln!(f, "|------------|------|----|---------|")?;
+        writeln!(f, "| IP Address | Port | ID | Latency | City | Country |")?;
+        writeln!(f, "|------------|------|----|---------| ---- | ------- |")?;
 
         for report_line in &self.report_lines {
             writeln!(f, "{}", report_line)?;
@@ -32,13 +32,22 @@ impl Display for ReportLine {
         match self.latency_in_milliseconds {
             Some(latency) => write!(
                 f,
-                "| {} | {} | {} | {} |",
-                self.host, self.port, self.id, latency
+                "| {} | {} | {} | {} | {} | {} |",
+                self.host,
+                self.port,
+                self.id,
+                latency,
+                self.city.clone().unwrap_or_default(),
+                self.country.clone().unwrap_or_default()
             ),
             None => write!(
                 f,
-                "| {} | {} | {} | Unreachable |",
-                self.host, self.port, self.id
+                "| {} | {} | {} | Unreachable | {} | {} |",
+                self.host,
+                self.port,
+                self.id,
+                self.city.clone().unwrap_or_default(),
+                self.country.clone().unwrap_or_default()
             ),
         }
     }
@@ -51,6 +60,8 @@ pub struct ReportLine {
     pub host: String,
     pub port: u16,
     pub latency_in_milliseconds: Option<u64>,
+    pub city: Option<String>,
+    pub country: Option<String>,
 }
 
 pub trait Reporting {

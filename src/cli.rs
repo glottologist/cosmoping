@@ -9,7 +9,7 @@ fn rationalize_path(input: &str, check_exists: bool) -> Result<PathBuf, Cosmopin
         path
     } else {
         std::env::current_dir()
-            .map_err(CosmopingError::AddrBookPathWasNotFound)?
+            .map_err(CosmopingError::AddrBookWasNotFound)?
             .join(path)
     };
 
@@ -45,6 +45,9 @@ pub struct AddrBookArgs {
 
     #[arg(short, long, value_parser = rationalize_optional_path)]
     pub output_path: Option<PathBuf>,
+
+    #[arg(short, long)]
+    pub location_api_key: Option<String>,
 }
 
 #[derive(Subcommand)]

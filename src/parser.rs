@@ -23,7 +23,7 @@ pub struct AddressInfo {
     pub last_ban_time: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInfo {
     pub id: String,
     pub ip: String,
@@ -50,7 +50,7 @@ impl Default for AddrBookParser {
 
 impl Parse for AddrBookParser {
     fn parse_addr_book(&self, addr_book_path: PathBuf) -> Result<AddrBook, CosmopingError> {
-        let file = File::open(addr_book_path)?;
+        let file = File::open(addr_book_path).map_err(CosmopingError::AddrBookWasNotFound)?;
         let reader = BufReader::new(file);
         let addr_book: AddrBook =
             serde_json::from_reader(reader).map_err(CosmopingError::UnableToParseAddrBookFile)?;

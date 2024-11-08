@@ -1,3 +1,5 @@
+use reqwest::Client;
+use serde::Deserialize;
 use std::cmp::Ordering;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
@@ -18,18 +20,37 @@ pub trait Ping {
     async fn ping_addr_book_hosts(&self, addr_book: AddrBook) -> Result<Report, CosmopingError>;
 }
 
-pub struct AddrBookPinger {}
+pub struct AddrBookPinger {
+    location_api_key: Option<String>,
+}
 
 impl AddrBookPinger {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(location_api_key: Option<String>) -> Self {
+        Self { location_api_key }
     }
 }
 
-impl Default for AddrBookPinger {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct GeoInfo {
+    ip: Option<String>,
+    city: Option<String>,
+    region: Option<String>,
+    country: Option<String>,
+    loc: Option<String>,
+    org: Option<String>,
+    postal: Option<String>,
+    timezone: Option<String>,
+    readme: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
+pub struct LatencyLine {
+    pub id: String,
+    pub host: String,
+    pub port: u16,
+    pub latency_in_milliseconds: Option<u64>,
 }
 
 #[async_trait]
@@ -38,11 +59,16 @@ impl Ping for AddrBookPinger {
         let handles: Vec<_> = addr_book
             .addrs
             .iter()
-            .map(|address_info| {
-                let ip = address_info.addr.ip.clone();
-                let port = address_info.addr.port;
-                let id = address_info.addr.id.clone();
-                task::spawn(async move { Self::measure_latency(id, ip, port).await })
+            .map(|ai| {
+                let addr = ai.addr.clone();
+                let lat_id = addr.id.clone();
+                let lat_ip = addr.ip.clone();
+                let lat_port = addr.port;
+                let api_key = self.location_api_key.clone();
+                task::spawn(async move {
+                    Self::measure_latency(api_key.clone(), lat_id.clone(), lat_ip.clone(), lat_port)
+                        .await
+                })
             })
             .collect();
 
@@ -50,8 +76,8 @@ impl Ping for AddrBookPinger {
         let mut report_lines = join_all(handles)
             .await
             .into_iter()
-            .filter(|r| r.is_ok())
-            .filter_map(|r| r.unwrap())
+            .filter_map(Result::ok)
+            .flatten()
             .collect::<Vec<_>>();
 
         report_lines.sort_by(|a, b| {
@@ -69,12 +95,22 @@ impl Ping for AddrBookPinger {
 
 #[async_trait]
 trait Latency: Sync + Send {
-    async fn measure_latency(id: String, host: String, port: u16) -> Option<ReportLine>;
+    async fn measure_latency(
+        api_key: Option<String>,
+        id: String,
+        host: String,
+        port: u16,
+    ) -> Option<ReportLine>;
 }
 
 #[async_trait]
 impl Latency for AddrBookPinger {
-    async fn measure_latency(id: String, host: String, port: u16) -> Option<ReportLine> {
+    async fn measure_latency(
+        api_key: Option<String>,
+        id: String,
+        host: String,
+        port: u16,
+    ) -> Option<ReportLine> {
         info!("Measuring latency for  {} on {}:{}", &id, &host, &port);
         // Construct the socket address
         let socket_addr: SocketAddr = match format!("{}:{}", host, port).parse() {
@@ -96,12 +132,64 @@ impl Latency for AddrBookPinger {
             }
             _ => None,
         };
+        let geo = if dur.is_some() {
+            if api_key.is_some() {
+                info!("Getting location for  {} on {}:{}", &id, &host, &port);
+                let token = api_key.unwrap();
+                let url = format!("https://ipinfo.io/{}?token={}", host, token);
 
-        Some(ReportLine {
-            id,
-            host,
-            port,
-            latency_in_milliseconds: dur,
-        })
+                let client = Client::new();
+                match client.get(&url).send().await {
+                    Ok(r) => {
+                        if r.status().is_success() {
+                            match r.json::<GeoInfo>().await {
+                                Ok(g) => Some(g),
+                                Err(e) => {
+                                    error!(
+                                        "Error getting location for {} | {} on {}",
+                                        host, e, &url
+                                    );
+                                    None
+                                }
+                            }
+                        } else {
+                            error!(
+                                "Error getting location for {} | {} on {}",
+                                host,
+                                r.status(),
+                                &url
+                            );
+                            None
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error getting location for {} | {}", host, e);
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        match geo {
+            None => Some(ReportLine {
+                id,
+                host,
+                port,
+                latency_in_milliseconds: dur,
+                city: None,
+                country: None,
+            }),
+            Some(g) => Some(ReportLine {
+                id,
+                host,
+                port,
+                latency_in_milliseconds: dur,
+                city: g.city,
+                country: g.country,
+            }),
+        }
     }
 }

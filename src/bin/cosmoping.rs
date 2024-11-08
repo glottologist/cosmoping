@@ -10,13 +10,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Parse command-line arguments
     let cli = Cli::parse();
-    dotenv::dotenv().ok();
 
     use Command::*;
     match cli.command {
         Latency(ab) => {
             info!("Running latency report for {}", ab.addrbook_path.display());
-            cosmoping::latency_report(ab.addrbook_path, ab.output_path).await?;
+            cosmoping::latency_report(ab.addrbook_path, ab.output_path, ab.location_api_key)
+                .await?;
         }
     }
 

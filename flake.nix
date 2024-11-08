@@ -97,6 +97,7 @@
           name = "Cosmoping shell for Rust";
           env.GREET = "devenv for Cosmoping";
           env.PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+          env.LOCATION_API_TOKEN = "a8c634caacb142";
           packages = with pkgs; [
             git
             mdbook
@@ -129,7 +130,7 @@
             '';
 
             cosmoping.exec = ''
-              cargo run -- latency --addrbook-path ./addrbook.json
+              cargo run -- latency --addrbook-path ./addrbook.json --output-path ./latencies.md --location-api-key $LOCATION_API_TOKEN
 
             '';
           };
