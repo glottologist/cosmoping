@@ -51,29 +51,20 @@ pub struct LatencyLine {
 #[async_trait]
 impl Ping for AddrBookPinger {
     async fn ping_addr_book_hosts(&self, addr_book: AddrBook) -> Result<Report, CosmopingError> {
-        let handles: Vec<_> = addr_book
-            .addrs
-            .iter()
-            .map(|ai| {
-                let addr = ai.addr.clone();
-                let lat_id = addr.id.clone();
-                let lat_ip = addr.ip.clone();
-                let lat_port = addr.port;
-                let api_key = self.location_api_key.clone();
-                task::spawn(async move {
-                    Self::measure_latency(api_key.clone(), lat_id.clone(), lat_ip.clone(), lat_port)
-                        .await
-                })
-            })
-            .collect();
+        let mut rep_opts: Vec<Option<ReportLine>> = Vec::new();
+        for addr in addr_book.addrs.iter() {
+            let lat_id = addr.addr.id.clone();
+            let lat_ip = addr.addr.ip.clone();
+            let lat_port = addr.addr.port;
+            let api_key = self.location_api_key.clone();
+            let rep =
+                Self::measure_latency(api_key.clone(), lat_id.clone(), lat_ip.clone(), lat_port)
+                    .await;
+            rep_opts.push(rep);
+        }
 
         // Handle errors in the results
-        let mut report_lines = join_all(handles)
-            .await
-            .into_iter()
-            .filter_map(Result::ok)
-            .flatten()
-            .collect::<Vec<_>>();
+        let mut report_lines = rep_opts.iter().flatten().cloned().collect::<Vec<_>>();
 
         report_lines.sort_by(|a, b| {
             match (&a.latency_in_milliseconds, &b.latency_in_milliseconds) {
