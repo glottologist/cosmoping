@@ -1,5 +1,6 @@
 use crate::{
     error::CosmopingError,
+    net_info::attempt_to_get_net_info,
     parser::AddrBook,
     reporter::{Report, ReportLine},
 };
@@ -7,7 +8,7 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use reqwest::Client;
 use serde::Deserialize;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap};
 use tokio::task;
 use tracing::{error, info};
 
@@ -25,6 +26,7 @@ impl AddrBookPinger {
         Self { location_api_key }
     }
 }
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct GeoInfo {
@@ -39,27 +41,56 @@ pub struct GeoInfo {
     readme: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-pub struct LatencyLine {
+pub struct MonikerData {
     pub id: String,
-    pub host: String,
-    pub port: u16,
-    pub latency_in_milliseconds: Option<u64>,
+    pub moniker: String,
+    pub remote_ip: String,
+    pub port: Option<u64>,
 }
 
 #[async_trait]
 impl Ping for AddrBookPinger {
     async fn ping_addr_book_hosts(&self, addr_book: AddrBook) -> Result<Report, CosmopingError> {
-        let mut rep_opts: Vec<Option<ReportLine>> = Vec::new();
+        let mut monikers: HashMap<String, MonikerData> = HashMap::new();
+
         for addr in addr_book.addrs.iter() {
-            let lat_id = addr.addr.id.clone();
-            let lat_ip = addr.addr.ip.clone();
-            let lat_port = addr.addr.port;
+            let net_info = attempt_to_get_net_info(addr).await;
+            for md in net_info {
+                if !monikers.contains_key(&md.id) {
+                    monikers.insert(md.id.clone(), md);
+                }
+            }
+        }
+
+        for addr in addr_book.addrs.iter() {
+            if !monikers.contains_key(&addr.addr.id) {
+                monikers.insert(
+                    addr.addr.id.clone(),
+                    MonikerData {
+                        id: addr.addr.id.clone(),
+                        moniker: "Unknown".to_string(),
+                        remote_ip: addr.addr.ip.clone(),
+                        port: Some(addr.addr.port as u64),
+                    },
+                );
+            }
+        }
+
+        let mut rep_opts: Vec<Option<ReportLine>> = Vec::new();
+        for addr in monikers.values() {
+            let lat_id = addr.id.clone();
+            let lat_ip = addr.remote_ip.clone();
             let api_key = self.location_api_key.clone();
-            let rep =
-                Self::measure_latency(api_key.clone(), lat_id.clone(), lat_ip.clone(), lat_port)
-                    .await;
+            let rep = Self::measure_latency(
+                api_key.clone(),
+                lat_id.clone(),
+                lat_ip.clone(),
+                addr.moniker.clone(),
+                addr.port,
+            )
+            .await;
             rep_opts.push(rep);
         }
 
@@ -85,7 +116,8 @@ trait Latency: Sync + Send {
         api_key: Option<String>,
         id: String,
         host: String,
-        port: u16,
+        moniker: String,
+        port: Option<u64>,
     ) -> Option<ReportLine>;
 }
 
@@ -95,9 +127,10 @@ impl Latency for AddrBookPinger {
         api_key: Option<String>,
         id: String,
         host: String,
-        port: u16,
+        moniker: String,
+        port: Option<u64>,
     ) -> Option<ReportLine> {
-        info!("Measuring latency for  {} on {}:{}", &id, &host, &port);
+        info!("Measuring latency for  {}:{} on {}", &id, &moniker, &host);
         let payload = [0; 8];
         let ip_host = host.parse().ok();
 
@@ -112,7 +145,7 @@ impl Latency for AddrBookPinger {
 
         let geo = if dur.is_some() {
             if api_key.is_some() {
-                info!("Getting location for  {} on {}:{}", &id, &host, &port);
+                info!("Getting location for  {} on {}", &id, &host);
                 let token = api_key.unwrap();
                 let url = format!("https://ipinfo.io/{}?token={}", host, token);
 
@@ -155,6 +188,7 @@ impl Latency for AddrBookPinger {
             None => Some(ReportLine {
                 id,
                 host,
+                moniker,
                 port,
                 latency_in_milliseconds: dur,
                 city: None,
@@ -163,6 +197,7 @@ impl Latency for AddrBookPinger {
             Some(g) => Some(ReportLine {
                 id,
                 host,
+                moniker,
                 port,
                 latency_in_milliseconds: dur,
                 city: g.city,

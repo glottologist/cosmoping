@@ -7,6 +7,7 @@ use tracing::info;
 use writer::{AddrBookWriter, Writing};
 pub mod cli;
 pub mod error;
+pub mod net_info;
 pub mod parser;
 pub mod pinger;
 pub mod reporter;

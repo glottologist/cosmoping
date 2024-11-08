@@ -343,6 +343,7 @@ dependencies = [
  "envy",
  "futures",
  "proptest",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
