@@ -22,7 +22,7 @@ jobs:
         with:
           nix_conf: experimental-features = nix-command flakes
       - name: Build
-        run: nix build .#cosmoping --print-build-logs
+        run: nix build .#cosmoping --print-build-logs--accept-flake-config 
 
       - name: Adjust permissions
         run: |
