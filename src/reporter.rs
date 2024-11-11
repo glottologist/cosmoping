@@ -19,7 +19,7 @@ impl Display for Report {
         // Write the table header
         writeln!(
             f,
-            "| IP Address  | ID | Ping Latency(ms) | City | Country |"
+            "| IP Address  | ID | Moniker | Port| Ping Latency(ms) | City | Country |"
         )?;
         writeln!(f, "|------------|----|---------| ---- | ------- |")?;
 
