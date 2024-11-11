@@ -15,8 +15,13 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Latency(ab) => {
             info!("Running latency report for {}", ab.addrbook_path.display());
-            cosmoping::latency_report(ab.addrbook_path, ab.output_path, ab.location_api_key)
-                .await?;
+            cosmoping::latency_report(
+                ab.addrbook_path,
+                ab.chain_id,
+                ab.output_path,
+                ab.location_api_key,
+            )
+            .await?;
         }
     }
 

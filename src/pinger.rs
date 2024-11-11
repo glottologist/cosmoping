@@ -19,11 +19,15 @@ pub trait Ping {
 
 pub struct AddrBookPinger {
     location_api_key: Option<String>,
+    chain_id: String,
 }
 
 impl AddrBookPinger {
-    pub fn new(location_api_key: Option<String>) -> Self {
-        Self { location_api_key }
+    pub fn new(location_api_key: Option<String>, chain_id: String) -> Self {
+        Self {
+            location_api_key,
+            chain_id,
+        }
     }
 }
 
@@ -56,7 +60,7 @@ impl Ping for AddrBookPinger {
         let mut monikers: HashMap<String, MonikerData> = HashMap::new();
 
         for addr in addr_book.addrs.iter() {
-            let net_info = attempt_to_get_net_info(addr).await;
+            let net_info = attempt_to_get_net_info(addr, &self.chain_id).await;
             for md in net_info {
                 if !monikers.contains_key(&md.id) {
                     monikers.insert(md.id.clone(), md);

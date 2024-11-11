@@ -15,6 +15,7 @@ pub mod writer;
 
 pub async fn latency_report(
     path: PathBuf,
+    chain_id: String,
     output_path: Option<PathBuf>,
     api_key_opt: Option<String>,
 ) -> Result<(), CosmopingError> {
@@ -22,7 +23,7 @@ pub async fn latency_report(
         info!("No location api key defined in the environment.  No locations will be sourced");
     }
     let addr_book = AddrBookParser::default().parse_addr_book(path)?;
-    let latencies = AddrBookPinger::new(api_key_opt)
+    let latencies = AddrBookPinger::new(api_key_opt, chain_id)
         .ping_addr_book_hosts(addr_book)
         .await?;
     let _ = AddrBookReporter::default().report_addr_book(&latencies);

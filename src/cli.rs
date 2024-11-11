@@ -43,6 +43,9 @@ pub struct AddrBookArgs {
     #[arg(short, long, value_parser = rationalize_addr_path)]
     pub addrbook_path: PathBuf,
 
+    #[arg(short, long)]
+    pub chain_id: String,
+
     #[arg(short, long, value_parser = rationalize_optional_path)]
     pub output_path: Option<PathBuf>,
 
